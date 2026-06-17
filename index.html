@@ -30,9 +30,11 @@
     --accent-bg:   #FAF2F5;
 
     /* Grade colours */
-    --rc:   #4A7848; --rc-bg:      #EDF5EC;
-    --cc:   #7A4268; --cc-bg:      #F5EEF3;
+    --na:   #9A9A9A; --na-bg:      #F4F4F4;
     --nc:   #8A3A3A; --nc-bg:      #F5EDEC;
+    --rc:   #4A7848; --rc-bg:      #EDF5EC;
+    --c:    #7A4268; --c-bg:       #F5EEF3;
+    --cd:   #3A5A7A; --cd-bg:      #EDF0F8;
     --done: #9A6080; --done-bg:    #F8F0F4;
 
     /* AO section colours */
@@ -237,9 +239,11 @@
     font-family: 'Inter', sans-serif;
     font-size: 10.5px; font-weight: 600; padding: 2px 9px; border-radius: 99px;
   }
-  .pill-rc   { background: var(--rc-bg);   color: var(--rc); }
-  .pill-cc   { background: var(--cc-bg);   color: var(--cc); }
+  .pill-na   { background: var(--na-bg);   color: var(--na); }
   .pill-nc   { background: var(--nc-bg);   color: var(--nc); }
+  .pill-rc   { background: var(--rc-bg);   color: var(--rc); }
+  .pill-c    { background: var(--c-bg);    color: var(--c); }
+  .pill-cd   { background: var(--cd-bg);   color: var(--cd); }
   .pill-none { background: var(--bg);      color: var(--text-3); }
 
   /* ── FILTER BAR ────────────────────────── */
@@ -388,9 +392,11 @@
     background: var(--surface); color: var(--text-3); transition: all 0.16s;
   }
   .grade-btn:hover { border-color: var(--dusty-rose); color: var(--rose); }
-  .grade-btn.active-RC { background: var(--rc-bg); color: var(--rc); border-color: var(--rc); }
-  .grade-btn.active-CC { background: var(--cc-bg); color: var(--cc); border-color: var(--cc); }
+  .grade-btn.active-NA { background: var(--na-bg); color: var(--na); border-color: var(--na); }
   .grade-btn.active-NC { background: var(--nc-bg); color: var(--nc); border-color: var(--nc); }
+  .grade-btn.active-RC { background: var(--rc-bg); color: var(--rc); border-color: var(--rc); }
+  .grade-btn.active-C  { background: var(--c-bg);  color: var(--c);  border-color: var(--c); }
+  .grade-btn.active-CD { background: var(--cd-bg); color: var(--cd); border-color: var(--cd); }
 
   /* ── AO LIST ───────────────────────────── */
   .ao-list { margin-top: 4px; }
@@ -482,7 +488,7 @@
   .topic-cell { font-family: 'Inter', sans-serif; font-weight: 500; color: var(--text); }
   .topic-cases { font-family: 'Inter', sans-serif; font-size: 11px; color: var(--text-3); margin-top: 2px; }
   .grade-cell { text-align: center; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; }
-  .grade-rc { color: var(--rc); } .grade-cc { color: var(--cc); } .grade-nc { color: var(--nc); }
+  .grade-na { color: var(--na); } .grade-nc { color: var(--nc); } .grade-rc { color: var(--rc); } .grade-c { color: var(--c); } .grade-cd { color: var(--cd); }
 
   /* ── RESPONSIVE ─────────────────────────── */
   @media (max-width: 700px) {
@@ -910,12 +916,12 @@ function renderDashboard() {
   const d2done = DAY2.filter(c=>getCase(c.id).done).length;
   const d3done = DAY3.filter(c=>getCase(c.id).done).length;
   const aoStats = {};
-  SECTIONS.forEach(s => aoStats[s] = {RC:0,CC:0,NC:0,none:0});
+  SECTIONS.forEach(s => aoStats[s] = {NA:0,NC:0,RC:0,C:0,CD:0,none:0});
   let totalAOs=0, gradedAOs=0;
   Object.values(db).forEach(c => {
     (c.aos||[]).forEach(a => {
       totalAOs++;
-      if (!aoStats[a.section]) aoStats[a.section]={RC:0,CC:0,NC:0,none:0};
+      if (!aoStats[a.section]) aoStats[a.section]={NA:0,NC:0,RC:0,C:0,CD:0,none:0};
       if (a.grade) { aoStats[a.section][a.grade]++; gradedAOs++; }
       else aoStats[a.section].none++;
     });
@@ -950,15 +956,17 @@ function renderDashboard() {
     <div class="section-title">AO grades by section</div>
     <div class="section-grid">
       ${SECTIONS.map(sec => {
-        const g = aoStats[sec]||{RC:0,CC:0,NC:0,none:0};
+        const g = aoStats[sec]||{NA:0,NC:0,RC:0,C:0,CD:0,none:0};
         const total = g.RC+g.CC+g.NC+g.none;
         return `<div class="section-card">
           <div class="section-card-title">${sec}</div>
           <div style="font-family:'Inter',sans-serif;font-size:10.5px;color:var(--text-3);margin-bottom:7px;letter-spacing:0.02em">${total} AOs total</div>
           <div class="grade-pills">
-            <span class="pill pill-rc">RC ${g.RC}</span>
-            <span class="pill pill-cc">CC ${g.CC}</span>
+            <span class="pill pill-na">NA ${g.NA}</span>
             <span class="pill pill-nc">NC ${g.NC}</span>
+            <span class="pill pill-rc">RC ${g.RC}</span>
+            <span class="pill pill-c">C ${g.C}</span>
+            <span class="pill pill-cd">CD ${g.CD}</span>
             ${g.none?`<span class="pill pill-none">— ${g.none}</span>`:''}
           </div>
         </div>`;
@@ -993,7 +1001,7 @@ function renderAOLibrary() {
     if (!cd.done) return;
     (cd.aos||[]).forEach(a => {
       const key = a.section+'|||'+a.topic;
-      if (!topicMap[key]) topicMap[key] = {section:a.section, topic:a.topic, cases:[], grades:{RC:0,CC:0,NC:0,none:0}};
+      if (!topicMap[key]) topicMap[key] = {section:a.section, topic:a.topic, cases:[], grades:{NA:0,NC:0,RC:0,C:0,CD:0,none:0}};
       topicMap[key].cases.push({name:c.name, year:c.year, grade:a.grade});
       if (a.grade) topicMap[key].grades[a.grade]++;
       else topicMap[key].grades.none++;
@@ -1023,7 +1031,7 @@ function renderAOLibrary() {
     </div>
     <div class="cases-table">
       <div class="ao-lib-header">
-        <div>Section</div><div>Topic</div><div style="text-align:center">Freq</div><div style="text-align:center">RC</div><div style="text-align:center">CC</div><div style="text-align:center">NC</div>
+        <div>Section</div><div>Topic</div><div style="text-align:center">Freq</div><div style="text-align:center">NA</div><div style="text-align:center">NC</div><div style="text-align:center">RC</div><div style="text-align:center">C</div><div style="text-align:center">CD</div>
       </div>
       ${rows.length ? rows.map(r => {
         const barW = Math.round((r.cases.length/maxFreq)*80);
@@ -1040,9 +1048,11 @@ function renderAOLibrary() {
               <div class="freq-bar" style="width:${barW}px;max-width:70px"></div>
             </div>
           </div>
-          <div class="grade-cell grade-rc">${r.grades.RC||'—'}</div>
-          <div class="grade-cell grade-cc">${r.grades.CC||'—'}</div>
+          <div class="grade-cell grade-na">${r.grades.NA||'—'}</div>
           <div class="grade-cell grade-nc">${r.grades.NC||'—'}</div>
+          <div class="grade-cell grade-rc">${r.grades.RC||'—'}</div>
+          <div class="grade-cell grade-c">${r.grades.C||'—'}</div>
+          <div class="grade-cell grade-cd">${r.grades.CD||'—'}</div>
         </div>`;
       }).join('') : `<div class="empty"><p>No AOs logged yet — practice some cases and add your AOs!</p></div>`}
     </div>`;
@@ -1136,7 +1146,7 @@ function renderScores() {
     ${practiced.length ? practiced.map(c => {
       const cd = getCase(c.id);
       const aos = cd.aos||[];
-      const counts = {RC:0,CC:0,NC:0,none:0};
+      const counts = {NA:0,NC:0,RC:0,C:0,CD:0,none:0};
       aos.forEach(a => { if(a.grade) counts[a.grade]++; else counts.none++; });
       return `
       <div class="cases-table" style="margin-bottom:18px">
@@ -1147,9 +1157,11 @@ function renderScores() {
           </div>
           <div style="display:flex;gap:8px;align-items:center">
             <div class="grade-pills">
-              <span class="pill pill-rc">RC ${counts.RC}</span>
-              <span class="pill pill-cc">CC ${counts.CC}</span>
+              <span class="pill pill-na">NA ${counts.NA}</span>
               <span class="pill pill-nc">NC ${counts.NC}</span>
+              <span class="pill pill-rc">RC ${counts.RC}</span>
+              <span class="pill pill-c">C ${counts.C}</span>
+              <span class="pill pill-cd">CD ${counts.CD}</span>
               ${counts.none?`<span class="pill pill-none">— ${counts.none}</span>`:''}
             </div>
           </div>
@@ -1162,7 +1174,7 @@ function renderScores() {
             <span class="ao-tag ao-${a.section}" style="justify-self:start">${a.section}</span>
             <span id="score-topic-${a.id}" style="font-size:13px;cursor:text;padding:2px 4px;border-radius:4px;margin-right:8px" onclick="scoresEditTopic('${c.id}','${a.id}')" title="Click to edit topic">${a.topic}${a.details?`<span class="ao-details"> — ${a.details}</span>`:''}</span>
             <div class="grade-btns" style="padding:0 8px">
-              ${['RC','CC','NC'].map(g=>`<button class="grade-btn ${a.grade===g?'active-'+g:''}" onclick="scoresSetGrade('${c.id}','${a.id}','${g}')">${g}</button>`).join('')}
+              ${['NA','NC','RC','C','CD'].map(g=>`<button class="grade-btn ${a.grade===g?'active-'+g:''}" onclick="scoresSetGrade('${c.id}','${a.id}','${g}')">${g}</button>`).join('')}
             </div>
             <button onclick="scoresDelAO('${c.id}','${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--text-3);font-size:16px;padding:0 4px;line-height:1" title="Delete AO">×</button>
           </div>`).join('')}
@@ -1280,7 +1292,7 @@ function renderAORow(a) {
     <span class="ao-section-tag ao-${a.section}">${a.section}</span>
     <span class="ao-topic">${a.topic}${a.details?`<span class="ao-details"> — ${a.details}</span>`:''}</span>
     <div class="grade-btns">
-      ${['RC','CC','NC'].map(g=>`<button class="grade-btn ${a.grade===g?'active-'+g:''}" onclick="setGrade('${a.id}','${g}')">${g}</button>`).join('')}
+      ${['NA','NC','RC','C','CD'].map(g=>`<button class="grade-btn ${a.grade===g?'active-'+g:''}" onclick="setGrade('${a.id}','${g}')">${g}</button>`).join('')}
     </div>
     <button class="ao-del" onclick="delAO('${a.id}')">×</button>
   </div>`;
@@ -1364,9 +1376,9 @@ function gradeColValue(sheet, naRowIdx, cols) {
 
 function mapGrade(raw) {
   if (!raw) return '';
-  if (raw === 'C' || raw === 'CD') return 'CC';
-  if (raw === 'NA') return '';
-  return raw; // RC, NC stay as-is
+  // Keep all CFE grades as-is: NA, NC, RC, C, CD
+  const valid = ['NA','NC','RC','C','CD'];
+  return valid.includes(raw) ? raw : '';
 }
 
 function parseFeedbackGuide(wb) {
@@ -1493,7 +1505,7 @@ function showMappingUI(parsed, filename, caseId) {
           <span class="ao-tag ao-${p.section}" style="margin-top:1px;flex-shrink:0">${p.section}</span>
           <div style="flex:1;min-width:0">
             <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${p.rawTitle}">${p.rawTitle}</div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:1px">Grade: <b style="${p.grade==='RC'?'color:var(--rc)':p.grade==='CC'?'color:var(--cc)':p.grade==='NC'?'color:var(--nc)':'color:var(--text-3)'}">${p.grade||'—'}</b></div>
+            <div style="font-size:11px;color:var(--text-3);margin-top:1px">Grade: <b style="${p.grade==='RC'?'color:var(--rc)':p.grade==='C'?'color:var(--c)':p.grade==='CD'?'color:var(--cd)':p.grade==='NC'?'color:var(--nc)':p.grade==='NA'?'color:var(--na)':'color:var(--text-3)'}">${p.grade||'—'}</b></div>
           </div>
           <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-2);white-space:nowrap;flex-shrink:0;margin-top:2px">
             <input type="checkbox" id="map-skip-${i}" onchange="handleMapSkip(${i})"> Skip
