@@ -589,6 +589,16 @@
         <span id="auth-switch-link">Sign up</span>
       </button>
     </div>
+
+    <!-- Beta notice -->
+    <div style="margin-top:22px;padding:10px 14px;background:#FFF8F0;border:1px solid #FFE0B2;border-radius:12px;text-align:left">
+      <div style="font-size:11px;font-weight:700;color:#E65100;letter-spacing:0.05em;margin-bottom:4px">⚠ Beta Version</div>
+      <div style="font-size:11px;color:#BF360C;line-height:1.6">
+        This tracker is currently in testing.<br>
+        Please export your data regularly.<br>
+        We do not guarantee data retention.
+      </div>
+    </div>
   </div>
 </div>
 
@@ -922,6 +932,13 @@ function renderDashboard() {
         <button class="btn" onclick="document.getElementById('import-json-input').click()">⬆ Restore backup</button>
         <input type="file" id="import-json-input" accept=".json" style="display:none" onchange="importJSON(this)">
         <button class="btn" onclick="if(confirm('This will erase all your saved progress. Continue?')){db={};saveDB();renderAll();}">Reset data</button>
+      </div>
+    </div>
+    <div style="padding:10px 16px;background:#FFF8F0;border:1px solid #FFE0B2;border-radius:14px;margin-bottom:20px;display:flex;align-items:flex-start;gap:10px">
+      <span style="font-size:16px">⚠</span>
+      <div>
+        <span style="font-size:12px;font-weight:700;color:#E65100">Beta Version</span>
+        <span style="font-size:12px;color:#BF360C;margin-left:8px">This tracker is currently in testing. Please export your data regularly. We do not guarantee data retention.</span>
       </div>
     </div>
     <div class="stats-row">
