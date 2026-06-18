@@ -880,7 +880,7 @@ const SECTIONS = ['MA','FR','Tax','Audit','Finance','SG'];
 const EXCEL_SEED = {};
 
 // ── THEME ───────────────────────────────────────────────────────────
-function applyTheme(theme) {
+function applyTheme(theme, save = true) {
   document.body.classList.remove('theme-rose');
   if (theme === 'rose') document.body.classList.add('theme-rose');
 
@@ -890,13 +890,13 @@ function applyTheme(theme) {
     if (btn) btn.classList.toggle('active', t === theme);
   });
 
-  localStorage.setItem('cfe-theme', theme);
+  if (save) { localStorage.setItem('cfe-theme', theme); }
 }
 
 // Apply saved theme on load — always start Professional on the auth screen,
 // then restore the user's saved preference once they log in.
 (function() {
-  applyTheme('professional');
+  applyTheme('professional', false);
 })();
 
 // ── SUPABASE INIT ────────────────────────────────────────────────────
