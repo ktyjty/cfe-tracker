@@ -93,47 +93,77 @@
     --input-bg:    var(--bg);
   }
 
-  /* ── MIDNIGHT THEME ─────────────────────────────────────────────── */
-  .theme-midnight {
-    --bg:          #0D1117;
-    --surface:     #161B22;
-    --border:      #21262D;
-    --border-soft: #1C2128;
-    --text:        #E6EDF3;
-    --text-2:      #8B949E;
-    --text-3:      #484F58;
-    --accent:      #388BFD;
-    --accent-bg:   #1C2D4A;
+  /* ── PROFESSIONAL-ONLY OVERRIDES ──────────────────────────────── */
+  /* Hide bows in Professional mode only */
+  body:not(.theme-rose) .sidebar-logo::before,
+  body:not(.theme-rose) .page-header h2::after,
+  body:not(.theme-rose) .section-card::before { display: none !important; }
 
-    --na:   #6E7681; --na-bg:  #1C2128;
-    --nc:   #F85149; --nc-bg:  #2D1318;
-    --rc:   #3FB950; --rc-bg:  #122720;
-    --c:    #58A6FF; --c-bg:   #0D2045;
-    --cd:   #BC8CFF; --cd-bg:  #2A1B3D;
-    --done: #388BFD; --done-bg:#1C2D4A;
-
-    --ma:      #58A6FF; --ma-bg:      #0D2045;
-    --fr:      #3FB950; --fr-bg:      #122720;
-    --tax:     #F0883E; --tax-bg:     #2D1F0D;
-    --audit:   #BC8CFF; --audit-bg:   #2A1B3D;
-    --finance: #39D0D8; --finance-bg: #0D2A2D;
-    --sg:      #FF7B72; --sg-bg:      #2D1515;
-
-    --radius:      10px;
-    --radius-lg:   16px;
-    --shadow:      0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
-
-    --sidebar-bg:     #010409;
-    --sidebar-text:   #E6EDF3;
-    --sidebar-text2:  #484F58;
-    --sidebar-active-bg: rgba(56,139,253,0.15);
-    --sidebar-active-color: #58A6FF;
-    --sidebar-hover:  rgba(255,255,255,0.06);
-    --logo-font:   'Inter', sans-serif;
-    --heading-font:'Inter', sans-serif;
-    --bg-pattern:  none;
-    --card-border: 1px solid #21262D;
-    --input-bg:    #0D1117;
+  /* Professional sidebar: dark, neutral */
+  body:not(.theme-rose) .sidebar {
+    background: var(--sidebar-bg);
+  }
+  body:not(.theme-rose) .sidebar-logo {
+    border-bottom-color: rgba(255,255,255,0.08);
+  }
+  body:not(.theme-rose) .sidebar-logo h1 {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    color: var(--sidebar-text);
+  }
+  body:not(.theme-rose) .sidebar-logo p {
+    color: var(--sidebar-text2);
+  }
+  body:not(.theme-rose) .nav-label {
+    color: var(--sidebar-text2);
+  }
+  body:not(.theme-rose) .nav-item {
+    color: var(--sidebar-text2);
+    font-family: 'Inter', sans-serif;
+  }
+  body:not(.theme-rose) .nav-item:hover {
+    background: var(--sidebar-hover);
+    color: var(--sidebar-text);
+  }
+  body:not(.theme-rose) .nav-item.active {
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-active-color);
+    border-left: 2px solid var(--sidebar-active-color);
+    font-weight: 600;
+  }
+  body:not(.theme-rose) .nav-badge {
+    background: rgba(37,99,235,0.15);
+    color: var(--sidebar-active-color);
+    border-color: rgba(37,99,235,0.25);
+  }
+  body:not(.theme-rose) .sidebar::after {
+    border-top-color: rgba(255,255,255,0.08);
+  }
+  /* Professional: use Inter for headings, not serif */
+  body:not(.theme-rose) .page-header h2 {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  body:not(.theme-rose) .stat-val {
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+  }
+  body:not(.theme-rose) .case-name-cell {
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+  }
+  body:not(.theme-rose) .section-card-title {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    color: var(--text);
+  }
+  body:not(.theme-rose) .modal-header h3 {
+    font-family: 'Inter', sans-serif;
+    font-style: normal;
+    color: var(--text);
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -650,11 +680,7 @@
     <div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:600;font-style:italic;color:var(--warm-brown);margin-bottom:4px">CFE Tracker</div>
     <div style="font-size:12px;color:var(--text-3);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:28px">Practice · Progress · Pass</div>
 
-    <!-- Tab switcher -->
-    <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:99px;overflow:hidden;margin-bottom:24px">
-      <button id="tab-login" onclick="switchTab('login')" style="flex:1;padding:9px;border:none;background:var(--rose);color:white;font-family:'Inter',sans-serif;font-size:13px;font-weight:600;cursor:pointer;border-radius:99px 0 0 99px">Log in</button>
-      <button id="tab-signup" onclick="switchTab('signup')" style="flex:1;padding:9px;border:none;background:transparent;color:var(--text-2);font-family:'Inter',sans-serif;font-size:13px;font-weight:500;cursor:pointer;border-radius:0 99px 99px 0">Sign up</button>
-    </div>
+    <!-- No top tab pill — log in / sign up toggled by the link below -->
 
     <div id="auth-error" style="display:none;background:#FFF0F0;border:1px solid #FFCCCC;border-radius:10px;padding:9px 12px;font-size:12px;color:#C0392B;margin-bottom:14px;text-align:left"></div>
     <div id="auth-success" style="display:none;background:#F0FFF4;border:1px solid #C6F6D5;border-radius:10px;padding:9px 12px;font-size:12px;color:#276749;margin-bottom:14px;text-align:left"></div>
@@ -671,22 +697,22 @@
 
     <button onclick="handleAuth()" id="auth-btn" style="
       width:100%;padding:11px;border:none;border-radius:99px;
-      background:var(--rose);color:white;
+      background:var(--accent);color:white;
       font-family:'Inter',sans-serif;font-size:14px;font-weight:600;
       cursor:pointer;letter-spacing:0.02em;
     ">Log in</button>
 
-    <div style="margin-top:14px;font-size:11.5px;color:var(--text-3)">
+    <div style="margin-top:16px;font-size:11.5px;color:var(--text-3);text-align:center">
       <span id="auth-switch-text">Don't have an account?</span>
-      <button onclick="switchTab(currentTab==='login'?'signup':'login')" style="background:none;border:none;color:var(--rose);font-size:11.5px;cursor:pointer;font-weight:600;padding:0 2px">
+      <button onclick="switchTab(currentTab==='login'?'signup':'login')" style="background:none;border:none;color:var(--accent);font-size:11.5px;cursor:pointer;font-weight:600;padding:0 2px">
         <span id="auth-switch-link">Sign up</span>
       </button>
     </div>
 
     <!-- Beta notice -->
-    <div style="margin-top:22px;padding:10px 14px;background:#FFF8F0;border:1px solid #FFE0B2;border-radius:12px;text-align:left">
-      <div style="font-size:11px;font-weight:700;color:#E65100;letter-spacing:0.05em;margin-bottom:4px">⚠ Beta Version</div>
-      <div style="font-size:11px;color:#BF360C;line-height:1.6">
+    <div style="width:82%;max-width:340px;margin:26px auto 0;padding:12px 16px;background:#FFF8F0;border:1px solid #FFE0B2;border-radius:14px;text-align:center">
+      <div style="font-size:11px;font-weight:700;color:#E65100;letter-spacing:0.04em;margin-bottom:6px">⚠ Beta Version</div>
+      <div style="font-size:11px;color:#BF360C;line-height:1.45">
         This tracker is currently in testing.<br>
         Please export your data regularly.<br>
         We do not guarantee data retention.
@@ -745,10 +771,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
         Rosé
       </button>
-      <button class="nav-item" id="theme-btn-midnight" onclick="applyTheme('midnight')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-        Midnight
-      </button>
+
     </div>
     <div class="nav-section" style="margin-top:8px">
       <div class="nav-label">Filter by Section</div>
@@ -858,12 +881,11 @@ const EXCEL_SEED = {};
 
 // ── THEME ───────────────────────────────────────────────────────────
 function applyTheme(theme) {
-  document.body.classList.remove('theme-rose', 'theme-midnight');
-  if (theme === 'rose')      document.body.classList.add('theme-rose');
-  if (theme === 'midnight')  document.body.classList.add('theme-midnight');
+  document.body.classList.remove('theme-rose');
+  if (theme === 'rose') document.body.classList.add('theme-rose');
 
   // Update active indicator on sidebar buttons
-  ['professional','rose','midnight'].forEach(t => {
+  ['professional','rose'].forEach(t => {
     const btn = document.getElementById('theme-btn-' + t);
     if (btn) btn.classList.toggle('active', t === theme);
   });
@@ -871,10 +893,10 @@ function applyTheme(theme) {
   localStorage.setItem('cfe-theme', theme);
 }
 
-// Apply saved theme on load
+// Apply saved theme on load — always start Professional on the auth screen,
+// then restore the user's saved preference once they log in.
 (function() {
-  const saved = localStorage.getItem('cfe-theme') || 'professional';
-  applyTheme(saved);
+  applyTheme('professional');
 })();
 
 // ── SUPABASE INIT ────────────────────────────────────────────────────
@@ -888,11 +910,9 @@ let currentTab = 'login';
 function switchTab(tab) {
   currentTab = tab;
   const isLogin = tab === 'login';
-  document.getElementById('tab-login').style.background = isLogin ? 'var(--rose)' : 'transparent';
-  document.getElementById('tab-login').style.color = isLogin ? 'white' : 'var(--text-2)';
-  document.getElementById('tab-signup').style.background = isLogin ? 'transparent' : 'var(--rose)';
-  document.getElementById('tab-signup').style.color = isLogin ? 'var(--text-2)' : 'white';
-  document.getElementById('auth-btn').textContent = isLogin ? 'Log in' : 'Sign up';
+  const btn = document.getElementById('auth-btn');
+  btn.textContent = isLogin ? 'Log in' : 'Sign up';
+  btn.style.background = 'var(--accent)';
   document.getElementById('auth-switch-text').textContent = isLogin ? "Don't have an account?" : 'Already have an account?';
   document.getElementById('auth-switch-link').textContent = isLogin ? 'Sign up' : 'Log in';
   document.getElementById('auth-error').style.display = 'none';
@@ -915,16 +935,18 @@ async function handleAuth() {
   const password = document.getElementById('auth-password').value;
   const btn = document.getElementById('auth-btn');
   if (!email || !password) { showAuthError('Please enter email and password.'); return; }
-  btn.textContent = '…'; btn.disabled = true;
+  const originalText = currentTab === 'login' ? 'Log in' : 'Sign up';
+  btn.textContent = currentTab === 'login' ? 'Signing in…' : 'Creating account…';
+  btn.disabled = true;
   document.getElementById('auth-error').style.display = 'none';
 
   if (currentTab === 'login') {
     const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
-    if (error) { showAuthError(error.message); btn.textContent = 'Log in'; btn.disabled = false; return; }
+    if (error) { showAuthError(error.message); btn.textContent = originalText; btn.disabled = false; return; }
     onLogin(data.user);
   } else {
     const { data, error } = await _supabase.auth.signUp({ email, password });
-    if (error) { showAuthError(error.message); btn.textContent = 'Sign up'; btn.disabled = false; return; }
+    if (error) { showAuthError(error.message); btn.textContent = originalText; btn.disabled = false; return; }
     showAuthSuccess('✅ Account created! Please check your email to confirm, then log in.');
     switchTab('login');
     btn.textContent = 'Log in'; btn.disabled = false;
@@ -934,6 +956,9 @@ async function handleAuth() {
 async function onLogin(user) {
   currentUser = user;
   document.getElementById('auth-screen').style.display = 'none';
+  // Restore user's saved theme preference now that they're logged in
+  const savedTheme = localStorage.getItem('cfe-theme') || 'professional';
+  applyTheme(savedTheme);
   const topBar = document.getElementById('top-bar');
   topBar.style.display = 'flex';
   document.getElementById('top-user-email').textContent = user.email;
