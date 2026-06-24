@@ -1586,52 +1586,69 @@ function mapGrade(raw) {
 }
 
 function parseFeedbackGuide(wb) {
-  // Try to find the main data sheet (skip copyright/cover sheets)
-  const candidates = wb.SheetNames.filter(n => !n.toLowerCase().includes('copyright') && n !== 'Sheet2');
-  const sheetName = candidates[0];
+  // Find the main data sheet — skip copyright/© sheets and pick the one with most AO headers
+  const skipPattern = /copyright|©|cover/i;
+  const aoHeaderPattern = /^AO\s*\d+/i;
+
+  // Filter candidate sheet names
+  let candidates = wb.SheetNames.filter(n => !skipPattern.test(n) && !/^sheet\d+$/i.test(n));
+  if (!candidates.length) candidates = wb.SheetNames.filter(n => !skipPattern.test(n));
+  if (!candidates.length) candidates = wb.SheetNames;
+
+  // Pick the sheet with the most AO header rows
+  let sheetName = candidates[0];
+  let bestCount = 0;
+  for (const name of candidates) {
+    const s = wb.Sheets[name];
+    if (!s) continue;
+    const d = XLSX.utils.sheet_to_json(s, {header:1, defval:null});
+    const count = d.filter(r => r && r[0] && aoHeaderPattern.test(String(r[0]).trim())).length;
+    if (count > bestCount) { bestCount = count; sheetName = name; }
+  }
   if (!sheetName) throw new Error('Could not find a data sheet in this workbook.');
+
   const sheet = wb.Sheets[sheetName];
   const data = XLSX.utils.sheet_to_json(sheet, {header:1, defval:null});
 
-  const aoPattern = /^AO\s*\d+\s*[\(\-–—]/i;
+  // Looser AO pattern: AO<digits> followed by anything (space, (, -, letter)
+  // Handles malformed headers like "AO4 Assurance — ..." (missing opening paren)
+  const aoPattern = /^AO\s*\d+[\s\(\-–—]/i;
   const gradeValues = new Set(['NA','NC','RC','C','CD']);
   const results = [];
 
-  // Find which columns have grade values on NA rows — scan first 10 AO blocks
-  let gradeCols = [8, 7]; // default: col I (8), col H (7)
-
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
-    if (!row[0]) continue;
+    if (!row || !row[0]) continue;
     const cell0 = String(row[0]).trim();
-    if (aoPattern.test(cell0)) {
-      // Found AO header — find NA row within next 50 rows
-      const section = detectSection(cell0);
-      const topic = cleanTopic(cell0);
-      let grade = null;
-      for (let j = i+1; j < Math.min(i+55, data.length); j++) {
-        const r = data[j];
-        if (!r || !r[0]) continue;
-        const v = String(r[0]).trim();
-        if (v === 'NA') {
-          // Try columns in order: 8 (I), 7 (H), 9 (J)
-          const tryCol = [8, 7, 9, 6];
-          for (const col of tryCol) {
-            const val = r[col] !== null && r[col] !== undefined ? String(r[col]).trim() : null;
-            if (val && gradeValues.has(val)) { grade = val; break; }
-          }
-          break;
+    if (!aoPattern.test(cell0)) continue;
+
+    const section = detectSection(cell0);
+    const topic = cleanTopic(cell0);
+    let grade = null;
+
+    for (let j = i + 1; j < Math.min(i + 60, data.length); j++) {
+      const r = data[j];
+      if (!r || !r[0]) continue;
+      const v = String(r[0]).trim();
+      if (v === 'NA') {
+        // Try grade from array row first (cached formula values)
+        for (const col of [8, 7, 9, 6]) {
+          const arrVal = r[col] != null ? String(r[col]).trim() : null;
+          if (arrVal && gradeValues.has(arrVal)) { grade = arrVal; break; }
         }
-        // Stop if we hit another AO header
-        if (aoPattern.test(v)) break;
+        // Fallback: read directly from sheet cell object (handles uncached formulas)
+        if (!grade) {
+          grade = gradeColValue(sheet, j, [8, 7, 9, 6]);
+        }
+        break;
       }
-      results.push({ section, topic, rawTitle: cell0.replace(/\n/g,' ').trim(), grade: mapGrade(grade) });
+      if (aoPattern.test(v)) break;
     }
+    results.push({ section, topic, rawTitle: cell0.replace(/\n/g, ' ').trim(), grade: mapGrade(grade) });
   }
   return results;
 }
 
-// ── IMPORT HANDLER ───────────────────────────────────────────────────────────
 let pendingImport = null;
 
 function handleFGImport(input) {
