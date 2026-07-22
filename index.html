@@ -613,26 +613,30 @@
   }
 
   /* ── AO LIBRARY ────────────────────────── */
-  .ao-lib-header {
-    display: grid; grid-template-columns: 80px 1fr 80px 50px 50px 50px 50px 50px; gap: 8px;
-    padding: 11px 20px; font-family: 'Inter', sans-serif;
-    font-size: 9px; font-weight: 600; color: var(--text-3);
-    text-transform: uppercase; letter-spacing: 0.13em;
-    background: rgba(245,229,234,0.22); border-bottom: 1px solid var(--border-soft);
+  /* AO Library table */
+  .ao-lib-table { width: 100%; border-collapse: collapse; }
+  .ao-lib-table th {
+    font-family: 'Inter', sans-serif; font-size: 9px; font-weight: 600;
+    color: var(--text-3); text-transform: uppercase; letter-spacing: 0.13em;
+    padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border-soft);
+    background: rgba(245,229,234,0.22); white-space: nowrap;
   }
-  .ao-lib-row {
-    display: grid; grid-template-columns: 80px 1fr 80px 50px 50px 50px 50px 50px; gap: 8px;
-    padding: 12px 20px; border-bottom: 1px solid var(--border-soft);
-    align-items: center; font-size: 13px;
+  .ao-lib-table th.num { text-align: center; }
+  .ao-lib-table td {
+    padding: 12px 14px; border-bottom: 1px solid var(--border-soft);
+    vertical-align: middle; font-size: 13px;
   }
-  .ao-lib-row:last-child { border-bottom: none; }
-  .ao-lib-row:hover { background: rgba(245,229,234,0.18); }
-  .freq-bar-wrap { display: flex; align-items: center; gap: 6px; }
+  .ao-lib-table tr:last-child td { border-bottom: none; }
+  .ao-lib-table tr:hover td { background: rgba(245,229,234,0.18); }
+  .freq-bar-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .freq-bar { height: 2px; background: var(--dusty-rose); border-radius: 99px; opacity: 0.65; }
   .topic-cell { font-family: 'Inter', sans-serif; font-weight: 500; color: var(--text); }
   .topic-cases { font-family: 'Inter', sans-serif; font-size: 11px; color: var(--text-3); margin-top: 2px; }
   .grade-cell { text-align: center; font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600; }
   .grade-na { color: var(--na); } .grade-nc { color: var(--nc); } .grade-rc { color: var(--rc); } .grade-c { color: var(--c); } .grade-cd { color: var(--cd); }
+  /* compat: keep old selectors in case used elsewhere */
+  .ao-lib-header { display: none; }
+  .ao-lib-row { display: none; }
 
   /* ── RESPONSIVE ─────────────────────────── */
   @media (max-width: 700px) {
@@ -684,6 +688,9 @@
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(typeof pdfjsLib!=='undefined') pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 </head>
 <body>
 
@@ -820,7 +827,7 @@
   </main>
 </div>
 
-<input type="file" id="fg-file-input" accept=".xlsx" style="display:none" onchange="handleFGImport(this)">
+<input type="file" id="fg-file-input" accept=".xlsx,.docx,.pdf" style="display:none" onchange="handleFGImport(this)">
 
 <div class="modal-overlay hidden" id="modal-overlay" onclick="closeModal(event)">
   <div class="modal" id="modal-box">
@@ -1109,6 +1116,7 @@ function renderDashboard() {
     <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
       <div><h2>Dashboard</h2><p>Your CFE practice overview</p></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="exportExcelTracker()" style="background:var(--accent-bg);color:var(--accent);border-color:var(--accent);font-weight:600">📊 Export Excel Tracker</button>
         <button class="btn" onclick="exportJSON()">⬇ Export backup</button>
         <button class="btn" onclick="document.getElementById('import-json-input').click()">⬆ Restore backup</button>
         <input type="file" id="import-json-input" accept=".json" style="display:none" onchange="importJSON(this)">
@@ -1204,32 +1212,38 @@ function renderAOLibrary() {
       <input type="text" placeholder="Search topics…" value="${libSearch}" oninput="libSearch=this.value;renderAOLibrary()">
       ${['All',...SECTIONS].map(s=>`<button class="filter-chip${libSection===s?' on':''}" onclick="libSection='${s}';renderAOLibrary()">${s}</button>`).join('')}
     </div>
-    <div class="cases-table">
-      <div class="ao-lib-header">
-        <div>Section</div><div>Topic</div><div style="text-align:center">Freq</div><div style="text-align:center">NA</div><div style="text-align:center">NC</div><div style="text-align:center">RC</div><div style="text-align:center">C</div><div style="text-align:center">CD</div>
-      </div>
-      ${rows.length ? rows.map(r => {
-        const barW = Math.round((r.cases.length/maxFreq)*80);
-        const caseList = [...new Set(r.cases.map(c=>c.name))].join(', ');
-        return `<div class="ao-lib-row">
-          <div><span class="ao-tag ao-${r.section}">${r.section}</span></div>
-          <div>
-            <div class="topic-cell">${r.topic}</div>
-            <div class="topic-cases">${caseList}</div>
-          </div>
-          <div style="text-align:center">
-            <div class="freq-bar-wrap" style="justify-content:center;flex-direction:column;align-items:center;gap:2px">
-              <div style="font-size:13px;font-weight:700">${r.cases.length}×</div>
-              <div class="freq-bar" style="width:${barW}px;max-width:70px"></div>
-            </div>
-          </div>
-          <div class="grade-cell grade-na">${r.grades.NA||'—'}</div>
-          <div class="grade-cell grade-nc">${r.grades.NC||'—'}</div>
-          <div class="grade-cell grade-rc">${r.grades.RC||'—'}</div>
-          <div class="grade-cell grade-c">${r.grades.C||'—'}</div>
-          <div class="grade-cell grade-cd">${r.grades.CD||'—'}</div>
-        </div>`;
-      }).join('') : `<div class="empty"><p>No AOs logged yet — practice some cases and add your AOs!</p></div>`}
+    <div class="cases-table" style="overflow-x:auto">
+      <table class="ao-lib-table">
+        <thead><tr>
+          <th>Section</th><th>Topic</th>
+          <th class="num">Freq</th>
+          <th class="num">NA</th><th class="num">NC</th><th class="num">RC</th><th class="num">C</th><th class="num">CD</th>
+        </tr></thead>
+        <tbody>
+        ${rows.length ? rows.map(r => {
+          const barW = Math.round((r.cases.length/maxFreq)*80);
+          const caseList = [...new Set(r.cases.map(c=>c.name))].join(', ');
+          return `<tr>
+            <td><span class="ao-tag ao-${r.section}">${r.section}</span></td>
+            <td>
+              <div class="topic-cell">${r.topic}</div>
+              <div class="topic-cases">${caseList}</div>
+            </td>
+            <td style="text-align:center">
+              <div class="freq-bar-wrap">
+                <div style="font-size:13px;font-weight:700">${r.cases.length}×</div>
+                <div class="freq-bar" style="width:${barW}px;max-width:70px"></div>
+              </div>
+            </td>
+            <td class="grade-cell grade-na">${r.grades.NA||'—'}</td>
+            <td class="grade-cell grade-nc">${r.grades.NC||'—'}</td>
+            <td class="grade-cell grade-rc">${r.grades.RC||'—'}</td>
+            <td class="grade-cell grade-c">${r.grades.C||'—'}</td>
+            <td class="grade-cell grade-cd">${r.grades.CD||'—'}</td>
+          </tr>`;
+        }).join('') : `<tr><td colspan="8" class="empty"><p>No AOs logged yet — practice some cases and add your AOs!</p></td></tr>`}
+        </tbody>
+      </table>
     </div>`;
 }
 
@@ -1655,18 +1669,149 @@ function handleFGImport(input) {
   const file = input.files[0];
   if (!file) return;
   input.value = '';
+  const fname = file.name.toLowerCase();
+  const isDocx = fname.endsWith('.docx');
+  const isPdf  = fname.endsWith('.pdf');
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = async (e) => {
     try {
-      const wb = XLSX.read(e.target.result, {type:'array', cellFormula:false, cellStyles:false});
-      const parsed = parseFeedbackGuide(wb);
-      if (!parsed.length) { alert('No AOs found in this file.'); return; }
+      let parsed;
+      if (isDocx) {
+        const result = await mammoth.extractRawText({arrayBuffer: e.target.result});
+        parsed = parseFeedbackGuideText(result.value, file.name);
+      } else if (isPdf) {
+        const text = await extractPdfText(e.target.result);
+        parsed = parseFeedbackGuideText(text, file.name);
+      } else {
+        const wb = XLSX.read(e.target.result, {type:'array', cellFormula:false, cellStyles:false});
+        parsed = parseFeedbackGuide(wb);
+      }
+      if (!parsed.length) { alert('No AOs found in this file. Make sure it contains AO1, AO2... headings.'); return; }
       showMappingUI(parsed, file.name, modalCaseId || null);
     } catch(err) {
       alert('Error reading file: ' + err.message);
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// Extract all text from a PDF file using PDF.js
+async function extractPdfText(arrayBuffer) {
+  const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    // Sort items by vertical position then horizontal (top-to-bottom, left-to-right)
+    const items = content.items.slice().sort(function(a, b) {
+      const yDiff = Math.round(b.transform[5]) - Math.round(a.transform[5]);
+      if (Math.abs(yDiff) > 3) return yDiff;
+      return a.transform[4] - b.transform[4];
+    });
+    // Group into lines by Y position
+    let lastY = null;
+    let lineText = '';
+    items.forEach(function(item) {
+      const y = Math.round(item.transform[5]);
+      if (lastY !== null && Math.abs(y - lastY) > 3) {
+        fullText += lineText.trim() + '\n';
+        lineText = '';
+      }
+      lineText += item.str + ' ';
+      lastY = y;
+    });
+    if (lineText.trim()) fullText += lineText.trim() + '\n';
+    fullText += '\n';
+  }
+  return fullText;
+}
+
+function parseFeedbackGuideText(text, filename) {
+  const lines = text.split(/\n/).map(function(l){ return l.trim(); }).filter(Boolean);
+  const gradeValues = new Set(['NA','NC','RC','C','CD']);
+  const sectionMap = {
+    'FR':'FR','MA':'MA',
+    'F':'Finance','Finance':'Finance',
+    'AA':'Audit','Audit':'Audit','Assurance':'Audit',
+    'T':'Tax','Tax':'Tax','Taxation':'Tax',
+    'SG':'SG','Strategy':'SG','Governance':'SG',
+  };
+
+  // ── Step 1: Try to extract cover-page section map (PDF format) ──
+  // Looks for two consecutive lines like "AO1 AO2 AO3" / "MA MA SG"
+  const coverSectionMap = {};
+  for (let ci = 0; ci < Math.min(lines.length, 20); ci++) {
+    const aoListMatch = lines[ci].match(/^(AO\d+\s*)+$/);
+    if (aoListMatch && ci+1 < lines.length) {
+      const secListLine = lines[ci+1];
+      const aoNums = lines[ci].match(/AO(\d+)/g) || [];
+      const secCodes = secListLine.trim().split(/\s+/);
+      if (secCodes.length === aoNums.length) {
+        aoNums.forEach(function(ao, idx) {
+          const num = ao.replace('AO','');
+          coverSectionMap[num] = sectionMap[secCodes[idx]] || secCodes[idx];
+        });
+        break;
+      }
+    }
+  }
+
+  // ── Step 2: Parse each AO block ──────────────────────────────────
+  // AO header pattern: "AO1 – MA The candidate..." or "AO1 – MA" alone
+  const aoPattern = /^AO\s*(\d+)\s*[–\-—]\s*(FR|MA|F|Finance|AA|Audit|Assurance|T|Tax|Taxation|SG|Strategy|Governance)\b/i;
+  const results = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const aoMatch = line.match(aoPattern);
+    if (!aoMatch) continue;
+
+    const aoNum = aoMatch[1];
+    const rawSec = aoMatch[2];
+    // Prefer cover-page mapping, fall back to inline section code
+    const section = coverSectionMap[aoNum] || sectionMap[rawSec] || rawSec || 'MA';
+
+    // Build topic from rest of header line + next line if it continues
+    let topic = line.replace(/^AO\s*\d+\s*[–\-—]\s*(\S+)\s*/i, '').trim();
+    // If next line looks like a continuation (not an AO line, not a results line)
+    if (i+1 < lines.length) {
+      const next = lines[i+1];
+      if (!next.match(/^AO\s*\d+/) && !next.match(/^\d{4} Results/) && !next.match(/^(NA|NC|RC|C|CD)\s*[–\-]/)) {
+        if (!topic) {
+          topic = next.replace(/^The candidate\s*/i,'').trim();
+        } else if (next.match(/^\w/) && !next.match(/^(Marker|Ranking|Comments|\d{4})/i)) {
+          // Multi-line header — append
+          topic += ' ' + next;
+        }
+      }
+    }
+
+    // Look for grade in next ~40 lines (between this AO and the next)
+    // PDF version: "Ranking" on its own line, then empty (user hasn't filled it)
+    // Word version: "Ranking: RC" or standalone "RC"
+    let grade = '';
+    for (let j = i+1; j < Math.min(i+45, lines.length); j++) {
+      const w = lines[j].trim();
+      if (w.match(/^AO\s*\d+\s*[–\-—]/)) break; // next AO
+      // "Ranking: RC" or "Ranking RC"
+      const rm = w.match(/Ranking[:\s]+([A-Z]{1,2})\b/);
+      if (rm && gradeValues.has(rm[1])) { grade = rm[1]; break; }
+      // Line that IS just a grade
+      if (gradeValues.has(w)) { grade = w; break; }
+    }
+
+    // Clean up topic
+    topic = topic.replace(/^The candidate\s*/i,'').trim();
+    if (!topic) topic = 'AO' + aoNum;
+
+    results.push({
+      section: section,
+      topic: topic,
+      rawTitle: 'AO' + aoNum + ' – ' + section + ': ' + topic.substring(0, 80),
+      grade: grade,
+    });
+  }
+  return results;
 }
 
 function getAllKnownTopics() {
@@ -1685,20 +1830,36 @@ function showMappingUI(parsed, filename, caseId) {
   const allCases = [...DAY2,...DAY3];
   const knownTopics = getAllKnownTopics();
 
-  function topicOpts(fgSection) {
-    const same = knownTopics.filter(t=>t.section===fgSection);
-    const other = knownTopics.filter(t=>t.section!==fgSection);
-    const makeOpt = t => `<option value="${t.section}|||${t.topic}">${t.section} — ${t.topic}</option>`;
-    return `
-      <option value="__new__">＋ Add as new (keep FG title)</option>
-      <option value="__custom__">✏️ Type custom topic…</option>
-      ${same.length?`<optgroup label="── ${fgSection} ──">${same.map(makeOpt).join('')}</optgroup>`:''}
-      ${other.length?`<optgroup label="── Other sections ──">${other.map(makeOpt).join('')}</optgroup>`:''}`;
+  function topicOpts(sec) {
+    const same = knownTopics.filter(t=>t.section===sec);
+    const other = knownTopics.filter(t=>t.section!==sec);
+    const makeOpt = t => `<option value="${t.section}|||${t.topic}">${t.section} \u2014 ${t.topic}</option>`;
+    return `<option value="__new__">\ufe0f Add as new (keep FG title)</option>
+      <option value="__custom__">\u270f\ufe0f Type custom topic\u2026</option>
+      ${same.length?`<optgroup label="\u2500\u2500 ${sec} \u2500\u2500">${same.map(makeOpt).join('')}</optgroup>`:''}
+      ${other.length?`<optgroup label="\u2500\u2500 Other sections \u2500\u2500">${other.map(makeOpt).join('')}</optgroup>`:''}`;
   }
 
+  // ── Case selector with custom case option ──
   const caseSelectHtml = caseId
-    ? `<div style="font-size:12px;color:var(--text-2);margin-bottom:16px">Importing into: <b>${[...DAY2,...DAY3].find(c=>c.id===caseId)?.name}</b><input type="hidden" id="imp-case-sel" value="${caseId}"></div>`
-    : `<div style="margin-bottom:14px"><div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px">Import into case</div><select id="imp-case-sel" style="width:100%">${allCases.map(c=>`<option value="${c.id}">${c.name} (${c.year})</option>`).join('')}</select></div>`;
+    ? `<div style="font-size:12px;color:var(--text-2);margin-bottom:16px">Importing into: <b>${[...DAY2,...DAY3].find(c=>c.id===caseId)?.name||caseId}</b><input type="hidden" id="imp-case-sel" value="${caseId}"></div>`
+    : `<div style="margin-bottom:14px">
+        <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:5px">Import into case</div>
+        <select id="imp-case-sel" style="width:100%;margin-bottom:6px" onchange="toggleCustomCaseInput()">
+          ${allCases.map(c=>`<option value="${c.id}">${c.name} (${c.year})</option>`).join('')}
+          <option value="__custom_case__">\ufe0f Add a new case (not in list)\u2026</option>
+        </select>
+        <div id="custom-case-inputs" style="display:none">
+          <div style="display:flex;gap:8px">
+            <input type="text" id="custom-case-name" placeholder="Case name (e.g. Urban Oasis Ltd.)" style="flex:2;font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit">
+            <input type="text" id="custom-case-year" placeholder="Year (e.g. 2026 Mar)" style="flex:1;font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit">
+            <select id="custom-case-day" style="font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit">
+              <option value="day2">Day 2</option>
+              <option value="day3">Day 3</option>
+            </select>
+          </div>
+        </div>
+      </div>`;
 
   let picker = document.getElementById('import-picker');
   if (!picker) {
@@ -1711,43 +1872,71 @@ function showMappingUI(parsed, filename, caseId) {
   picker.innerHTML = `
   <div style="background:var(--surface);border-radius:var(--radius-lg);width:100%;max-width:740px;box-shadow:0 20px 60px rgba(0,0,0,0.25);margin:auto">
     <div style="padding:18px 24px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);border-radius:var(--radius-lg) var(--radius-lg) 0 0;z-index:1">
-      <div style="font-size:16px;font-weight:700">⬆ Import Feedback Guide</div>
-      <div style="font-size:11px;color:var(--text-3);margin-top:2px">${filename} · ${parsed.length} AOs detected</div>
+      <div style="font-size:16px;font-weight:700">\u2b06 Import Feedback Guide</div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:2px">${filename} \u00b7 ${parsed.length} AOs detected</div>
     </div>
-
     <div style="padding:16px 24px">
       ${caseSelectHtml}
-      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:4px">Map FG AOs → your high-level topics</div>
-      <div style="font-size:11px;color:var(--text-3);margin-bottom:12px">For each AO from the feedback guide, pick an existing high-level topic (to merge + apply grade), add as new, or skip.</div>
-
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:4px">Map FG AOs \u2192 your high-level topics</div>
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:12px">Edit section or grade if auto-detected incorrectly, then pick a topic or add as new.</div>
       ${parsed.map((p,i) => `
       <div style="border:1px solid var(--border);border-radius:var(--radius);padding:11px 12px;margin-bottom:8px;background:var(--bg)">
         <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">
-          <span class="ao-tag ao-${p.section}" style="margin-top:1px;flex-shrink:0">${p.section}</span>
           <div style="flex:1;min-width:0">
-            <div style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${p.rawTitle}">${p.rawTitle}</div>
-            <div style="font-size:11px;color:var(--text-3);margin-top:1px">Grade: <b style="${p.grade==='RC'?'color:var(--rc)':p.grade==='C'?'color:var(--c)':p.grade==='CD'?'color:var(--cd)':p.grade==='NC'?'color:var(--nc)':p.grade==='NA'?'color:var(--na)':'color:var(--text-3)'}">${p.grade||'—'}</b></div>
+            <div style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${p.rawTitle}">${p.rawTitle}</div>
           </div>
-          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-2);white-space:nowrap;flex-shrink:0;margin-top:2px">
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text-2);white-space:nowrap;flex-shrink:0">
             <input type="checkbox" id="map-skip-${i}" onchange="handleMapSkip(${i})"> Skip
           </label>
+        </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.08em">Section:</span>
+          <select id="map-sec-${i}" style="font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-family:inherit" onchange="handleMapSecChange(${i})">
+            ${SECTIONS.map(s=>`<option value="${s}" ${s===p.section?'selected':''}>${s}</option>`).join('')}
+          </select>
+          <span style="font-size:10px;color:var(--text-3);font-weight:600;text-transform:uppercase;letter-spacing:0.08em;margin-left:6px">Grade:</span>
+          <select id="map-grade-${i}" style="font-size:11px;padding:3px 7px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-family:inherit">
+            <option value="" ${!p.grade?'selected':''}>— not set —</option>
+            ${['NA','NC','RC','C','CD'].map(g=>`<option value="${g}" ${g===p.grade?'selected':''}>${g}</option>`).join('')}
+          </select>
         </div>
         <div id="map-row-${i}">
           <select id="map-sel-${i}" style="width:100%;font-size:12px" onchange="handleMapSelChange(${i})">
             ${topicOpts(p.section)}
           </select>
           <div id="map-custom-${i}" style="display:none;margin-top:6px">
-            <input type="text" id="map-custom-input-${i}" placeholder="High-level topic name…" style="width:100%;font-size:12px">
+            <input type="text" id="map-custom-input-${i}" placeholder="High-level topic name\u2026" style="width:100%;font-size:12px">
           </div>
         </div>
       </div>`).join('')}
     </div>
-
     <div style="padding:12px 24px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;position:sticky;bottom:0;background:var(--surface);border-radius:0 0 var(--radius-lg) var(--radius-lg)">
       <button class="btn" onclick="closeImportPicker()">Cancel</button>
       <button class="btn btn-primary" onclick="applyMapping()">Apply & Save</button>
     </div>
   </div>`;
+}
+
+function toggleCustomCaseInput() {
+  const sel = document.getElementById('imp-case-sel');
+  const box = document.getElementById('custom-case-inputs');
+  if (!sel || !box) return;
+  box.style.display = sel.value === '__custom_case__' ? 'block' : 'none';
+}
+
+function handleMapSecChange(i) {
+  const sec = document.getElementById('map-sec-'+i)?.value;
+  if (!sec) return;
+  const knownTopics = getAllKnownTopics();
+  const same = knownTopics.filter(t=>t.section===sec);
+  const other = knownTopics.filter(t=>t.section!==sec);
+  const makeOpt = t => `<option value="${t.section}|||${t.topic}">${t.section} \u2014 ${t.topic}</option>`;
+  const sel = document.getElementById('map-sel-'+i);
+  if (!sel) return;
+  sel.innerHTML = `<option value="__new__">\ufe0f Add as new (keep FG title)</option>
+    <option value="__custom__">\u270f\ufe0f Type custom topic\u2026</option>
+    ${same.length?`<optgroup label="\u2500\u2500 ${sec} \u2500\u2500">${same.map(makeOpt).join('')}</optgroup>`:''}
+    ${other.length?`<optgroup label="\u2500\u2500 Other sections \u2500\u2500">${other.map(makeOpt).join('')}</optgroup>`:''}`;
 }
 
 function handleMapSelChange(i) {
@@ -1773,8 +1962,22 @@ function closeImportPicker() {
 function applyMapping() {
   if (!pendingImport) return;
   const {parsed} = pendingImport;
-  const caseId = document.getElementById('imp-case-sel')?.value || pendingImport.caseId;
+  let caseId = document.getElementById('imp-case-sel')?.value || pendingImport.caseId;
   if (!caseId) { alert('Please select a case.'); return; }
+
+  // ── Handle custom case creation ──────────────────────────────────
+  let caseName = '';
+  if (caseId === '__custom_case__') {
+    const name = document.getElementById('custom-case-name')?.value.trim();
+    const year = document.getElementById('custom-case-year')?.value.trim();
+    const day  = document.getElementById('custom-case-day')?.value || 'day2';
+    if (!name) { alert('Please enter a case name.'); return; }
+    caseId = 'custom-' + Date.now();
+    caseName = name + (year ? ' (' + year + ')' : '');
+    const newCase = {id: caseId, year: year || 'Custom', name};
+    if (day === 'day2') DAY2.push(newCase);
+    else DAY3.push(newCase);
+  }
 
   const cd = getCase(caseId);
   if (!cd.aos) cd.aos = [];
@@ -1787,15 +1990,17 @@ function applyMapping() {
     const sel = document.getElementById('map-sel-'+i);
     if (!sel) return;
     const val = sel.value;
-    const grade = p.grade || '';
+    // Use the user-edited section and grade (overrides auto-detected values)
+    const section = document.getElementById('map-sec-'+i)?.value || p.section;
+    const grade   = document.getElementById('map-grade-'+i)?.value || p.grade || '';
 
     if (val === '__new__') {
-      cd.aos.push({id:'fg'+Date.now()+Math.random(), section:p.section, topic:p.topic, details:'', grade});
+      cd.aos.push({id:'fg'+Date.now()+Math.random(), section, topic:p.topic, details:'', grade});
       applied++;
     } else if (val === '__custom__') {
       const customTopic = document.getElementById('map-custom-input-'+i)?.value.trim();
       if (!customTopic) return;
-      cd.aos.push({id:'fg'+Date.now()+Math.random(), section:p.section, topic:customTopic, details:'', grade});
+      cd.aos.push({id:'fg'+Date.now()+Math.random(), section, topic:customTopic, details:'', grade});
       applied++;
     } else {
       // Map to existing topic
@@ -1806,7 +2011,7 @@ function applyMapping() {
       if (existing) {
         if (grade) existing.grade = grade;
       } else {
-        cd.aos.push({id:'fg'+Date.now()+Math.random(), section:sec, topic, details:'', grade});
+        cd.aos.push({id:'fg'+Date.now()+Math.random(), section, topic, details:'', grade});
       }
       applied++;
     }
@@ -1820,10 +2025,97 @@ function applyMapping() {
   }
   closeImportPicker();
   renderAll();
-  alert('✅ Applied ' + applied + ' AOs to ' + ([...DAY2,...DAY3].find(c=>c.id===caseId)?.name || caseId) + '.');
+  const displayName = caseName || [...DAY2,...DAY3].find(c=>c.id===caseId)?.name || caseId;
+  alert('✅ Applied ' + applied + ' AOs to ' + displayName + '.');
 }
 
 
+
+function exportExcelTracker() {
+  const CA_OPT_LIST = [
+    'Attack strategy','Misinterpretation of required','Missed part of required',
+    'Quant analysis — support','Quant analysis — breadth','Quant analysis — depth',
+    'Qual analysis — breadth','Qual analysis — depth',
+    'Use of case facts','Use of relevant technical',
+    'Conclusions','Time management','User objectives','Other',
+  ];
+
+  const trackRows = [];
+  trackRows.push(['CFE Day 2 and Day 3 Tracker — Exported from CFE Tracker']);
+  trackRows.push([]);
+  trackRows.push([
+    'Case', 'Date', 'AO #',
+    'Role Specific Requireds (Day 2 Only)',
+    'FR — IFRS', 'FR — ASPE', 'FR — ASNPO', 'FR — Other',
+    'MA — Quant', 'MA — Qual', 'MA — Combined',
+    'Audit & Assurance', 'Strategy & Governance', 'Finance', 'Taxation',
+    'Assessment Opportunity Topic',
+    'Notes / Corrective Actions'
+  ]);
+
+  const caMap = {};
+  CA_OPT_LIST.forEach(o => caMap[o] = 0);
+
+  const allCases = [...DAY2, ...DAY3];
+  allCases.forEach(c => {
+    const cd = db[c.id];
+    if (!cd || !cd.done) return;
+    (cd.aos || []).forEach((a, idx) => {
+      const grade = a.grade || '';
+      const cols = Array(12).fill(null);
+      if (a.section === 'FR') {
+        const sub = a.subsection || '';
+        if (sub === 'IFRS')       cols[1] = grade;
+        else if (sub === 'ASPE')  cols[2] = grade;
+        else if (sub === 'ASNPO') cols[3] = grade;
+        else                      cols[4] = grade;
+      } else if (a.section === 'MA') {
+        const sub = a.subsection || '';
+        if (sub === 'Quant')         cols[5] = grade;
+        else if (sub === 'Qual')     cols[6] = grade;
+        else                         cols[7] = grade;
+      } else if (a.section === 'Audit')   cols[8]  = grade;
+      else if (a.section === 'SG')        cols[9]  = grade;
+      else if (a.section === 'Finance')   cols[10] = grade;
+      else if (a.section === 'Tax')       cols[11] = grade;
+
+      const caList = (a.corrective_actions || []).join(', ');
+      const notes = [caList, a.ca_note].filter(Boolean).join(' | ');
+      (a.corrective_actions || []).forEach(opt => { if (caMap[opt] !== undefined) caMap[opt]++; });
+
+      trackRows.push([
+        c.name, cd.date || '', 'AO'+(idx+1), null,
+        cols[1], cols[2], cols[3], cols[4],
+        cols[5], cols[6], cols[7],
+        cols[8], cols[9], cols[10], cols[11],
+        a.topic, notes,
+      ]);
+    });
+  });
+
+  // Corrective Actions summary sheet
+  const caRows = [
+    ['Corrective Actions Summary'],
+    [],
+    ['Corrective Action', 'Times Selected'],
+    ...CA_OPT_LIST.map(opt => [opt, caMap[opt] || 0]),
+  ];
+
+  const wb = XLSX.utils.book_new();
+  const ws1 = XLSX.utils.aoa_to_sheet(trackRows);
+  const ws2 = XLSX.utils.aoa_to_sheet(caRows);
+  ws1['!cols'] = [
+    {wch:28},{wch:12},{wch:6},{wch:14},
+    {wch:8},{wch:8},{wch:8},{wch:8},
+    {wch:8},{wch:8},{wch:10},
+    {wch:8},{wch:8},{wch:8},{wch:8},
+    {wch:40},{wch:50}
+  ];
+  ws2['!cols'] = [{wch:35},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Tracking');
+  XLSX.utils.book_append_sheet(wb, ws2, 'Corrective Actions');
+  XLSX.writeFile(wb, 'CFE_Tracker_Export_' + new Date().toISOString().slice(0,10) + '.xlsx');
+}
 
 function exportJSON() {
   const data = JSON.stringify(db, null, 2);
