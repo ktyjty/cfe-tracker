@@ -687,6 +687,7 @@
   .score-add-toggle:hover { border-color: var(--dusty-rose); color: var(--rose); }
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -2032,89 +2033,264 @@ function applyMapping() {
 
 
 function exportExcelTracker() {
-  const CA_OPT_LIST = [
-    'Attack strategy','Misinterpretation of required','Missed part of required',
-    'Quant analysis — support','Quant analysis — breadth','Quant analysis — depth',
-    'Qual analysis — breadth','Qual analysis — depth',
-    'Use of case facts','Use of relevant technical',
-    'Conclusions','Time management','User objectives','Other',
+  if (typeof ExcelJS === 'undefined') {
+    alert('ExcelJS not loaded yet. Please wait a moment and try again.');
+    return;
+  }
+
+  // ── Column map (1-based ExcelJS columns) ──────────────────────────
+  // A=1 Day, B=2 Case, C=3 Date, D=4 AO#,
+  // E=5 FR, F=6 MA, G=7 AA, H=8 SG, I=9 Finance, J=10 Tax,
+  // K=11 Topic, L=12 Notes
+
+  function sectionToCol(sec) {
+    if (sec === 'FR')      return 5;
+    if (sec === 'MA')      return 6;
+    if (sec === 'Audit')   return 7;
+    if (sec === 'SG')      return 8;
+    if (sec === 'Finance') return 9;
+    if (sec === 'Tax')     return 10;
+    return null;
+  }
+
+  // Grade static fill + font (applied directly to each cell for instant colour)
+  var GRADE_STYLE = {
+    'NA': { bg:'FF000000', font:'FFFFFFFF' },
+    'NC': { bg:'FFFF0000', font:'FFFFFFFF' },
+    'RC': { bg:'FFFFFF00', font:'FF000000' },
+    'C':  { bg:'FF00B050', font:'FFFFFFFF' },
+    'CD': { bg:'FF00B0F0', font:'FFFFFFFF' },
+  };
+
+  var THIN       = {style:'thin',   color:{argb:'FFD0D0D0'}};
+  var THIN_DARK  = {style:'thin',   color:{argb:'FF000000'}};
+  var MED_DARK   = {style:'medium', color:{argb:'FF000000'}};
+  var CELL_BORDER = {top:THIN, bottom:THIN, left:THIN, right:THIN};
+  var HDR_BORDER  = {top:THIN_DARK, bottom:MED_DARK, left:THIN_DARK, right:THIN_DARK};
+  var HDR_FILL    = {type:'pattern', pattern:'solid', fgColor:{argb:'FFFFC000'}};
+  var HDR_FONT    = {name:'Calibri', size:11, bold:true};
+  var DATA_FONT   = {name:'Calibri', size:11};
+
+  // ── Build flat row list + case-group map ─────────────────────────
+  var rows = [];        // flat AO rows for data section
+  var caseGroups = [];  // [{start,end} 0-based index into rows[]]
+
+  var allCases = DAY2.concat(DAY3);
+  allCases.forEach(function(cas) {
+    var cd = db[cas.id];
+    if (!cd || !cd.done || !cd.aos || !cd.aos.length) return;
+    var isDay2 = DAY2.some(function(d){ return d.id === cas.id; });
+    var dayLabel = isDay2 ? 'Day 2' : 'Day 3';
+    var groupStart = rows.length;
+    cd.aos.forEach(function(a, aoIdx) {
+      var grade = a.grade || '';
+      var notes = [(a.corrective_actions||[]).join(', '), a.ca_note||'']
+                    .filter(Boolean).join(' | ');
+      rows.push({
+        dayLabel: dayLabel,
+        caseName: cas.name,
+        date:     cd.date || '',
+        aoNum:    'AO' + (aoIdx + 1),
+        gradeCol: sectionToCol(a.section),
+        grade:    grade,
+        topic:    a.topic || '',
+        notes:    notes,
+      });
+    });
+    caseGroups.push({start: groupStart, end: rows.length - 1});
+  });
+
+  // ── Create workbook ───────────────────────────────────────────────
+  var wb = new ExcelJS.Workbook();
+  wb.creator = 'CFE Tracker';
+  var ws = wb.addWorksheet('Tracking');
+
+  ws.columns = [
+    {width:12},  // A Day
+    {width:38},  // B Case
+    {width:14},  // C Date
+    {width:10},  // D AO#
+    {width:18},  // E FR
+    {width:22},  // F MA
+    {width:18},  // G AA
+    {width:16},  // H SG
+    {width:10},  // I Finance
+    {width:12},  // J Tax
+    {width:30},  // K Topic
+    {width:52},  // L Notes
   ];
 
-  const trackRows = [];
-  trackRows.push(['CFE Day 2 and Day 3 Tracker — Exported from CFE Tracker']);
-  trackRows.push([]);
-  trackRows.push([
-    'Case', 'Date', 'AO #',
-    'Role Specific Requireds (Day 2 Only)',
-    'FR — IFRS', 'FR — ASPE', 'FR — ASNPO', 'FR — Other',
-    'MA — Quant', 'MA — Qual', 'MA — Combined',
-    'Audit & Assurance', 'Strategy & Governance', 'Finance', 'Taxation',
-    'Assessment Opportunity Topic',
-    'Notes / Corrective Actions'
-  ]);
+  // ── Intro rows ────────────────────────────────────────────────────
+  var r2 = ws.getRow(2);
+  r2.getCell(1).value = 'How to use:';
+  r2.getCell(1).font  = {name:'Calibri', size:11, bold:true};
 
-  const caMap = {};
-  CA_OPT_LIST.forEach(o => caMap[o] = 0);
+  ws.getRow(3).getCell(1).value = 'Input the ranking (NA, NC, RC, C, CD) you scored on each assessment opportunity (AO) for each case you write.  Use a separate line for each AO.';
+  ws.getRow(3).getCell(1).font = DATA_FONT;
+  ws.getRow(4).getCell(1).value = 'The rankings will be automatically colour coded as follows:';
+  ws.getRow(4).getCell(1).font = DATA_FONT;
 
-  const allCases = [...DAY2, ...DAY3];
-  allCases.forEach(c => {
-    const cd = db[c.id];
-    if (!cd || !cd.done) return;
-    (cd.aos || []).forEach((a, idx) => {
-      const grade = a.grade || '';
-      const cols = Array(12).fill(null);
-      if (a.section === 'FR') {
-        const sub = a.subsection || '';
-        if (sub === 'IFRS')       cols[1] = grade;
-        else if (sub === 'ASPE')  cols[2] = grade;
-        else if (sub === 'ASNPO') cols[3] = grade;
-        else                      cols[4] = grade;
-      } else if (a.section === 'MA') {
-        const sub = a.subsection || '';
-        if (sub === 'Quant')         cols[5] = grade;
-        else if (sub === 'Qual')     cols[6] = grade;
-        else                         cols[7] = grade;
-      } else if (a.section === 'Audit')   cols[8]  = grade;
-      else if (a.section === 'SG')        cols[9]  = grade;
-      else if (a.section === 'Finance')   cols[10] = grade;
-      else if (a.section === 'Tax')       cols[11] = grade;
+  // Grade preview row (row 5, cols E-I)
+  var preview = [
+    {g:'NA', bg:'FF000000', fc:'FFFFFFFF'},
+    {g:'NC', bg:'FFFF0000', fc:'FFFFFFFF'},
+    {g:'RC', bg:'FFFFFF00', fc:'FF000000'},
+    {g:'C',  bg:'FF00B050', fc:'FFFFFFFF'},
+    {g:'CD', bg:'FF00B0F0', fc:'FFFFFFFF'},
+  ];
+  preview.forEach(function(p, i) {
+    var cell = ws.getRow(5).getCell(5 + i);
+    cell.value = p.g;
+    cell.font  = {name:'Calibri', size:11, bold:true, color:{argb:p.fc}};
+    cell.fill  = {type:'pattern', pattern:'solid', fgColor:{argb:p.bg}};
+    cell.alignment = {horizontal:'center', vertical:'middle'};
+  });
 
-      const caList = (a.corrective_actions || []).join(', ');
-      const notes = [caList, a.ca_note].filter(Boolean).join(' | ');
-      (a.corrective_actions || []).forEach(opt => { if (caMap[opt] !== undefined) caMap[opt]++; });
+  ws.getRow(7).getCell(1).value = 'Include the results for every CFE Day 2 and Day 3 case that you write between now and the CFE.';
+  ws.getRow(7).getCell(1).font = DATA_FONT;
+  ws.getRow(8).getCell(1).value = 'Analyze your results at the end of each week.  If needed, refer back to the Tracking and Analyzing Your Results session.';
+  ws.getRow(8).getCell(1).font = DATA_FONT;
 
-      trackRows.push([
-        c.name, cd.date || '', 'AO'+(idx+1), null,
-        cols[1], cols[2], cols[3], cols[4],
-        cols[5], cols[6], cols[7],
-        cols[8], cols[9], cols[10], cols[11],
-        a.topic, notes,
-      ]);
+  // ── Header row (row 10) ───────────────────────────────────────────
+  var HDR_ROW = 10;
+  ws.getRow(HDR_ROW).height = 42;
+  var headers = [
+    'Day 1/2/3', 'Case', 'Date', 'Assessment Opportunity\n#',
+    'Financial Reporting', 'Management Accounting',
+    'Audit and Assurance', 'Strategy and Governance',
+    'Finance', 'Taxation',
+    'Assessment Opportunity\nTopic',
+    "Notes\n(Brief explanation of why you didn't score C; add corrective actions to eliminate weaknesses identified)",
+  ];
+  headers.forEach(function(h, i) {
+    var cell = ws.getRow(HDR_ROW).getCell(i + 1);
+    cell.value     = h;
+    cell.font      = HDR_FONT;
+    cell.fill      = HDR_FILL;
+    cell.border    = HDR_BORDER;
+    cell.alignment = {horizontal:'center', vertical:'middle', wrapText:true};
+  });
+
+  // ── Data rows (starting at Excel row 11) ─────────────────────────
+  var DATA_START = 11;
+  rows.forEach(function(r, i) {
+    var exRow = DATA_START + i;
+    var wsRow = ws.getRow(exRow);
+    wsRow.height = 18;
+
+    function plain(col, val, ha) {
+      var cell = wsRow.getCell(col);
+      cell.value     = val;
+      cell.font      = DATA_FONT;
+      cell.border    = CELL_BORDER;
+      cell.alignment = {vertical:'middle', horizontal: ha||'left', wrapText:true};
+    }
+
+    plain(1,  r.dayLabel, 'center');
+    plain(2,  r.caseName, 'left');
+    plain(3,  r.date,     'center');
+    plain(4,  r.aoNum,    'center');
+
+    // Grade columns (5-10): set value + STATIC fill for instant colour
+    for (var col = 5; col <= 10; col++) {
+      var cell = wsRow.getCell(col);
+      cell.border    = CELL_BORDER;
+      cell.alignment = {horizontal:'center', vertical:'middle'};
+      if (col === r.gradeCol && r.grade && GRADE_STYLE[r.grade]) {
+        var gs = GRADE_STYLE[r.grade];
+        cell.value = r.grade;
+        cell.font  = {name:'Calibri', size:11, bold:true, color:{argb: gs.font}};
+        cell.fill  = {type:'pattern', pattern:'solid', fgColor:{argb: gs.bg}};
+      } else {
+        cell.value = '';
+        cell.font  = DATA_FONT;
+      }
+    }
+
+    plain(11, r.topic, 'left');
+    plain(12, r.notes, 'left');
+  });
+
+  var DATA_END = DATA_START + rows.length - 1;
+
+  // ── Merge Day / Case / Date per case group ────────────────────────
+  caseGroups.forEach(function(g) {
+    var firstRow = DATA_START + g.start;
+    var lastRow  = DATA_START + g.end;
+    if (firstRow === lastRow) return; // single AO — no merge needed
+
+    // Clear duplicate values in non-first rows of the group
+    for (var r = firstRow + 1; r <= lastRow; r++) {
+      ws.getRow(r).getCell(1).value = null;
+      ws.getRow(r).getCell(2).value = null;
+      ws.getRow(r).getCell(3).value = null;
+    }
+
+    // Merge cols A, B, C across the group
+    ['A','B','C'].forEach(function(col, ci) {
+      ws.mergeCells(col + firstRow + ':' + col + lastRow);
+      var mc = ws.getRow(firstRow).getCell(ci + 1);
+      mc.alignment = {vertical:'middle', horizontal: ci===0?'center':'left', wrapText:true};
+      mc.border    = CELL_BORDER;
+      mc.font      = DATA_FONT;
     });
   });
 
-  // Corrective Actions summary sheet
-  const caRows = [
-    ['Corrective Actions Summary'],
-    [],
-    ['Corrective Action', 'Times Selected'],
-    ...CA_OPT_LIST.map(opt => [opt, caMap[opt] || 0]),
-  ];
+  // ── Conditional formatting (so colour updates when user edits) ───
+  // Using CF as a SECONDARY mechanism — static fill above handles initial colour
+  // CF uses relative row reference (no $ on row) so Excel applies per-row
+  if (rows.length > 0) {
+    var gradeCFCols = ['E','F','G','H','I','J'];
+    var cfRules = [
+      {val:'NA', bg:'FF000000', fc:'FFFFFFFF', p:1},
+      {val:'NC', bg:'FFFF0000', fc:'FFFFFFFF', p:2},
+      {val:'RC', bg:'FFFFFF00', fc:'FF000000', p:3},
+      {val:'CD', bg:'FF00B0F0', fc:'FFFFFFFF', p:4},
+      // C last with exact match guard; higher priority number = lower priority in Excel
+      {val:'C',  bg:'FF00B050', fc:'FFFFFFFF', p:5},
+    ];
 
-  const wb = XLSX.utils.book_new();
-  const ws1 = XLSX.utils.aoa_to_sheet(trackRows);
-  const ws2 = XLSX.utils.aoa_to_sheet(caRows);
-  ws1['!cols'] = [
-    {wch:28},{wch:12},{wch:6},{wch:14},
-    {wch:8},{wch:8},{wch:8},{wch:8},
-    {wch:8},{wch:8},{wch:10},
-    {wch:8},{wch:8},{wch:8},{wch:8},
-    {wch:40},{wch:50}
-  ];
-  ws2['!cols'] = [{wch:35},{wch:16}];
-  XLSX.utils.book_append_sheet(wb, ws1, 'Tracking');
-  XLSX.utils.book_append_sheet(wb, ws2, 'Corrective Actions');
-  XLSX.writeFile(wb, 'CFE_Tracker_Export_' + new Date().toISOString().slice(0,10) + '.xlsx');
+    gradeCFCols.forEach(function(col) {
+      var cfRef = col + DATA_START + ':' + col + DATA_END;
+      cfRules.forEach(function(rule) {
+        // Formula: no $ on row so Excel evaluates per row
+        // For "C" use exact-length check to avoid matching "NC"/"RC"
+        var formula = rule.val === 'C'
+          ? '=AND(' + col + DATA_START + '="C",LEN(' + col + DATA_START + ')=1)'
+          : '=' + col + DATA_START + '="' + rule.val + '"';
+        ws.addConditionalFormatting({
+          ref: cfRef,
+          rules: [{
+            type:     'expression',
+            priority: rule.p,
+            formulae: [formula],
+            style: {
+              font: {bold:true, color:{argb: rule.fc}},
+              fill: {type:'pattern', pattern:'solid', fgColor:{argb: rule.bg}},
+            },
+          }],
+        });
+      });
+    });
+  }
+
+  // ── Download ──────────────────────────────────────────────────────
+  var date = new Date().toISOString().slice(0,10);
+  wb.xlsx.writeBuffer().then(function(buf) {
+    var blob = new Blob([buf], {
+      type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    var url = URL.createObjectURL(blob);
+    var a   = document.createElement('a');
+    a.href  = url;
+    a.download = 'CFE_Tracker_Export_' + date + '.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }).catch(function(err) {
+    alert('Export failed: ' + err.message);
+  });
 }
 
 function exportJSON() {
