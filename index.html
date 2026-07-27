@@ -1043,6 +1043,19 @@ async function loadDB() {
       const keys = Object.keys(db);
       const totalAOs = keys.reduce((n,k) => n + ((db[k].aos||[]).length), 0);
       console.log('[loadDB] Loaded', keys.length, 'cases,', totalAOs, 'AOs (row id:', data[0].id, ')');
+
+      // Restore custom cases back into DAY2/DAY3 arrays
+      const customCases = db['__custom_cases__'] || [];
+      customCases.forEach(function(c) {
+        const alreadyInDay2 = DAY2.some(function(d){ return d.id === c.id; });
+        const alreadyInDay3 = DAY3.some(function(d){ return d.id === c.id; });
+        if (!alreadyInDay2 && !alreadyInDay3) {
+          const entry = {id: c.id, year: c.year || 'Custom', name: c.name};
+          if (c.day === 'day3') DAY3.push(entry);
+          else DAY2.push(entry);
+          console.log('[loadDB] Restored custom case:', c.name);
+        }
+      });
     } else {
       console.warn('[loadDB] No data found — starting fresh');
       db = {};
@@ -2022,6 +2035,9 @@ async function applyMapping() {
     const newCase = {id: caseId, year: year || 'Custom', name};
     if (day === 'day2') DAY2.push(newCase);
     else DAY3.push(newCase);
+    // Persist custom case metadata so it survives page refresh
+    if (!db['__custom_cases__']) db['__custom_cases__'] = [];
+    db['__custom_cases__'].push({id: caseId, name, year: year || 'Custom', day});
   }
 
   const cd = getCase(caseId);
