@@ -1041,22 +1041,34 @@ async function loadDB() {
   } catch(e) { db = {}; }
 }
 
-async function saveDB() {
+async function saveDB(opts) {
   if (!currentUser) return;
-  // Debounce saves — wait 800ms after last change
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    const { data: existing } = await _supabase
-      .from('tracker_data')
-      .select('id')
-      .eq('user_id', currentUser.id)
-      .single();
-    if (existing) {
-      await _supabase.from('tracker_data').update({ data: db }).eq('user_id', currentUser.id);
-    } else {
-      await _supabase.from('tracker_data').insert({ user_id: currentUser.id, data: db });
-    }
-  }, 800);
+  const immediate = opts && opts.immediate;
+
+  async function doSave() {
+    try {
+      const { data: existing } = await _supabase
+        .from('tracker_data')
+        .select('id')
+        .eq('user_id', currentUser.id)
+        .single();
+      if (existing) {
+        await _supabase.from('tracker_data').update({ data: db }).eq('user_id', currentUser.id);
+      } else {
+        await _supabase.from('tracker_data').insert({ user_id: currentUser.id, data: db });
+      }
+    } catch(e) { console.error('saveDB error:', e); }
+  }
+
+  if (immediate) {
+    // Skip debounce — write to Supabase right now (used after FG import & modal save)
+    clearTimeout(saveTimer);
+    await doSave();
+  } else {
+    // Debounce for rapid UI changes (grade clicks, etc.)
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(doSave, 800);
+  }
 }
 function getCase(id) { return db[id] || { done: false, date: '', aos: [], notes: '' }; }
 
@@ -1550,7 +1562,7 @@ function delAO(aoId) {
 function saveCase() {
   if (!modalCaseId) return;
   db[modalCaseId] = JSON.parse(JSON.stringify(modalDraft));
-  saveDB(); closeModal(); renderAll();
+  saveDB({immediate: true}); closeModal(); renderAll();
 }
 
 function closeModal(e) {
@@ -1960,7 +1972,7 @@ function closeImportPicker() {
   pendingImport = null;
 }
 
-function applyMapping() {
+async function applyMapping() {
   if (!pendingImport) return;
   const {parsed} = pendingImport;
   let caseId = document.getElementById('imp-case-sel')?.value || pendingImport.caseId;
@@ -2019,7 +2031,7 @@ function applyMapping() {
   });
 
   db[caseId] = cd;
-  saveDB();
+  await saveDB({immediate: true});  // immediate — don't let debounce lose data on refresh
   if (modalCaseId === caseId) {
     modalDraft = JSON.parse(JSON.stringify(cd));
     renderModalBody();
