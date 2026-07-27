@@ -1044,18 +1044,39 @@ async function loadDB() {
       const totalAOs = keys.reduce((n,k) => n + ((db[k].aos||[]).length), 0);
       console.log('[loadDB] Loaded', keys.length, 'cases,', totalAOs, 'AOs (row id:', data[0].id, ')');
 
+      // Auto-repair: scan db for any custom- keys not yet in __custom_cases__
+      // This fixes existing users who created custom cases before this feature existed
+      var registeredIds = (db['__custom_cases__'] || []).map(function(c){ return c.id; });
+      var needsSave = false;
+      Object.keys(db).forEach(function(k) {
+        if (k.startsWith('custom-') && registeredIds.indexOf(k) === -1) {
+          if (!db['__custom_cases__']) db['__custom_cases__'] = [];
+          // Use case data to infer day (check if id exists in DAY3 list — otherwise default day2)
+          var inferredDay = 'day2';
+          var caseData = db[k];
+          // Use 'Custom' as name fallback — user will see it in Scores
+          db['__custom_cases__'].push({id: k, name: caseData.name || k, year: 'Custom', day: inferredDay});
+          registeredIds.push(k);
+          needsSave = true;
+          console.log('[loadDB] Auto-registered missing custom case:', k);
+        }
+      });
+
       // Restore custom cases back into DAY2/DAY3 arrays
       const customCases = db['__custom_cases__'] || [];
       customCases.forEach(function(c) {
         const alreadyInDay2 = DAY2.some(function(d){ return d.id === c.id; });
         const alreadyInDay3 = DAY3.some(function(d){ return d.id === c.id; });
         if (!alreadyInDay2 && !alreadyInDay3) {
-          const entry = {id: c.id, year: c.year || 'Custom', name: c.name};
+          const entry = {id: c.id, year: c.year || 'Custom', name: c.name || c.id};
           if (c.day === 'day3') DAY3.push(entry);
           else DAY2.push(entry);
-          console.log('[loadDB] Restored custom case:', c.name);
+          console.log('[loadDB] Restored custom case:', c.name || c.id);
         }
       });
+
+      // Save the auto-repair if needed
+      if (needsSave) saveDB({immediate: true});
     } else {
       console.warn('[loadDB] No data found — starting fresh');
       db = {};
@@ -2044,6 +2065,11 @@ async function applyMapping() {
   if (!cd.aos) cd.aos = [];
   cd.done = true;
   if (!cd.date) cd.date = new Date().toISOString().slice(0,10);
+  // Store case name so auto-repair can recover it after refresh
+  if (caseId.startsWith('custom-') && !cd.name) {
+    const caseEntry = [...DAY2,...DAY3].find(function(c){ return c.id===caseId; });
+    if (caseEntry) cd.name = caseEntry.name;
+  }
 
   let applied = 0;
   parsed.forEach((p, i) => {
