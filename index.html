@@ -2184,7 +2184,19 @@ function exportExcelTracker() {
   var rows = [];        // flat AO rows for data section
   var caseGroups = [];  // [{start,end} 0-based index into rows[]]
 
-  var allCases = DAY2.concat(DAY3);
+  // Sort cases by date practised (ascending — earliest first)
+  var allCases = DAY2.concat(DAY3)
+    .filter(function(c) {
+      var cd = db[c.id];
+      return cd && cd.done;
+    })
+    .sort(function(a, b) {
+      var da = (db[a.id] && db[a.id].date) || '';
+      var db_ = (db[b.id] && db[b.id].date) || '';
+      if (da < db_) return -1;
+      if (da > db_) return 1;
+      return 0;
+    });
   allCases.forEach(function(cas) {
     var cd = db[cas.id];
     if (!cd || !cd.done || !cd.aos || !cd.aos.length) return;
